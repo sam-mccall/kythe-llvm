@@ -1,0 +1,92 @@
+# Workflow to index LLVM project.
+#
+# Because the indexing takes more than an hour, our GITHUB_TOKEN credentials may
+# expire. A token `secrets.RELEASE_TOKEN` must exist with public_repo scope.
+name: Index LLVM project
+on:
+  # Allow triggering manually:
+  # curl -XPOST -d '{"event_type":"index"}' \
+  #  "-HAuthorization: Bearer <token>" \
+  #   https://api.github.com/repos/sam-mccall/llvm-kythe/dispatches
+  repository_dispatch: { types: index }
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pick last successful commit
+        id: pick
+        uses: clangd/actions/.github/actions/pick@v0.1.0
+        with:
+          repo: llvm/llvm-project
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compute release info
+        run: |
+          echo "RELEASE_COMMIT_SHORT=$(printf '%.12s' ${{ steps.pick.outputs.sha }})" >> $GITHUB_ENV
+          echo "RELEASE_DATE=$(date -u +%Y%m%d)" >> $GITHUB_ENV
+      - name: Create release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RELEASE_COMMIT_SHORT }}
+          release_name: ${{ env.RELEASE_COMMIT_SHORT }}
+          body: |
+            Index snapshot built from llvm/llvm-project@${{ steps.pick.outputs.sha }} on ${{ env.RELEASE_DATE }}.
+      - name: Install system tools
+        run: sudo apt-get install ninja-build build-essential swig python3-dev libedit-dev libncurses5-dev
+      - name: Fetch Kythe
+        run: >
+          KYTHE_VERSION=v0.0.48
+
+          wget "https://github.com/kythe/kythe/releases/download/$KYTHE_VERSION/kythe-$KYTHE_VERSION.tar.gz"
+
+          tar xfz kythe-$KYTHE_VERSION.tar.gz
+
+          echo "KYTHE=$PWD/kythe-$KYTHE_VERSION" >> $GITHUB_ENV
+      - name: Set environment variables
+        run: >
+          echo "BUILD_DIR=build" >> $GITHUB_ENV
+
+          mkdir kythe-out
+
+          echo "KYTHE_ROOT_DIRECTORY=$PWD/llvm-project"
+
+          echo "KYTHE_OUTPUT_DIRECTORY=$PWD/kythe-out" >> $GITHUB_ENV
+
+          echo "KYTHE_CORPUS=github.com/llvm/llvm-project"
+      - name: Clone LLVM
+        uses: actions/checkout@v2
+        with:
+          repository: llvm/llvm-project
+          path: llvm-project
+          ref: ${{ steps.pick.output.sha }}
+      # Create compile_commands.json for the indexer and build generated files.
+      - name: CMake
+        run: >
+          mkdir ${{ env.BUILD_DIR }}
+
+          cmake -G Ninja -S llvm-project/llvm -B ${{ env.BUILD_DIR }}
+          "-DLLVM_ENABLE_PROJECTS=all"
+          "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          "-DCMAKE_C_COMPILER=clang"
+          "-DCMAKE_CXX_COMPILER=clang++"
+      - name: Build generated files needed to parse code
+        run: >
+          ninja -C ${{ env.BUILD_DIR }} -t targets rule CUSTOM_COMMAND |
+          grep -E "\.(cpp|h|inc)\$" |
+          xargs ninja -C ${{ env.BUILD_DIR }}
+      - name: Run kythe indexer
+        run: >
+          $KYTHE/tools/runextractor compdb -extractor $KYTHE/extractors/cxx_extractor
+      - name: Merge index
+        run: >
+          $KYTHE/tools/kzip merge --output llvm.kzip $KYTHE_OUTPUT_DIRECTORY/*.zip
+      - name: Upload index to release
+        uses: actions/upload-release-asset@v1
+        env: { GITHUB_TOKEN: "${{ secrets.RELEASE_TOKEN }}" }
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_name: llvm-${{ env.RELEASE_DATE }}.kzip
+          asset_path: llvm.kzip
+          asset_content_type: application/zip
