@@ -64,9 +64,12 @@ jobs:
           ninja -C build -t targets rule CUSTOM_COMMAND |
           grep -E "\.(cpp|h|inc)\$" | grep -E -v "tests?/" |
           xargs ninja -C build
+        if: ${{ false }}
       - name: Run kythe indexer
         run: >
-          $KYTHE/tools/runextractor compdb -extractor $KYTHE/extractors/cxx_extractor
+          $KYTHE/tools/runextractor compdb
+          -path build/compile_commands.json
+          -extractor $KYTHE/extractors/cxx_extractor
       - name: Merge index
         run: >
           $KYTHE/tools/kzip merge --output llvm.kzip $KYTHE_OUTPUT_DIRECTORY/*.zip
