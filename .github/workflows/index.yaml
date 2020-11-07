@@ -7,7 +7,7 @@ on:
   # Allow triggering manually:
   # curl -XPOST -d '{"event_type":"index"}' \
   #  "-HAuthorization: Bearer <token>" \
-  #   https://api.github.com/repos/sam-mccall/llvm-kythe/dispatches
+  #   https://api.github.com/repos/sam-mccall/kythe-llvm/dispatches
   repository_dispatch: { types: index }
 jobs:
   index:
@@ -50,11 +50,11 @@ jobs:
 
           mkdir kythe-out
 
-          echo "KYTHE_ROOT_DIRECTORY=$PWD/llvm-project"
+          echo "KYTHE_ROOT_DIRECTORY=$PWD/llvm-project" >> $GITHUB_ENV
 
           echo "KYTHE_OUTPUT_DIRECTORY=$PWD/kythe-out" >> $GITHUB_ENV
 
-          echo "KYTHE_CORPUS=github.com/llvm/llvm-project"
+          echo "KYTHE_CORPUS=github.com/llvm/llvm-project" >> $GITHUB_ENV
       - name: Clone LLVM
         uses: actions/checkout@v2
         with:
