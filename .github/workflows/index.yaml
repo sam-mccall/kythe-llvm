@@ -36,8 +36,6 @@ jobs:
           echo "KYTHE=$PWD/kythe-$KYTHE_VERSION" >> $GITHUB_ENV
       - name: Set environment variables
         run: >
-          echo "BUILD_DIR=build" >> $GITHUB_ENV
-
           mkdir kythe-out
 
           echo "KYTHE_ROOT_DIRECTORY=$PWD/llvm-project" >> $GITHUB_ENV
@@ -54,18 +52,18 @@ jobs:
       # Create compile_commands.json for the indexer and build generated files.
       - name: CMake
         run: >
-          mkdir ${{ env.BUILD_DIR }}
+          mkdir build
 
-          cmake -G Ninja -S llvm-project/llvm -B ${{ env.BUILD_DIR }}
+          cmake -G Ninja -S llvm-project/llvm -B build
           "-DLLVM_ENABLE_PROJECTS=all"
           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
           "-DCMAKE_C_COMPILER=clang"
           "-DCMAKE_CXX_COMPILER=clang++"
       - name: Build generated files needed to parse. (Skip testonly for speed)
         run: >
-          ninja -C ${{ env.BUILD_DIR }} -t targets rule CUSTOM_COMMAND |
-          grep -E "\.(cpp|h|inc)\$" | grep -v unittests |
-          xargs ninja -C ${{ env.BUILD_DIR }}
+          ninja -C build -t targets rule CUSTOM_COMMAND |
+          grep -E "\.(cpp|h|inc)\$" | grep -E -v "tests?/" |
+          xargs ninja -C build
       - name: Run kythe indexer
         run: >
           $KYTHE/tools/runextractor compdb -extractor $KYTHE/extractors/cxx_extractor
@@ -76,7 +74,7 @@ jobs:
         uses: actions/create-release@v1
         id: create_release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
           tag_name: ${{ env.RELEASE_COMMIT_SHORT }}
           release_name: ${{ env.RELEASE_COMMIT_SHORT }}
