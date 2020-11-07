@@ -71,10 +71,10 @@ jobs:
           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
           "-DCMAKE_C_COMPILER=clang"
           "-DCMAKE_CXX_COMPILER=clang++"
-      - name: Build generated files needed to parse code
+      - name: Build generated files needed to parse. (Skip testonly for speed)
         run: >
           ninja -C ${{ env.BUILD_DIR }} -t targets rule CUSTOM_COMMAND |
-          grep -E "\.(cpp|h|inc)\$" |
+          grep -E "\.(cpp|h|inc)\$" | grep -v unittests |
           xargs ninja -C ${{ env.BUILD_DIR }}
       - name: Run kythe indexer
         run: >
