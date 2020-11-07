@@ -58,20 +58,25 @@ jobs:
           "-DLLVM_ENABLE_PROJECTS=all"
           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
           "-DCMAKE_C_COMPILER=clang"
+          "-DLLVM_INCLUDE_TESTS=Off"
+          "-DLLVM_INCLUDE_BENCHMARKS=Off"
+          "-DLLVM_INCLUDE_EXAMPLES=Off"
           "-DCMAKE_CXX_COMPILER=clang++"
       - name: Build generated files needed to parse. (Skip testonly for speed)
         run: >
           ninja -C build -t targets rule CUSTOM_COMMAND |
           grep -E "\.(cpp|h|inc)\$" | grep -E -v "tests?/" |
           xargs ninja -C build
+      # For now, consider success if any kzips were written.
       - name: Run kythe indexer
         run: >
           $KYTHE/tools/runextractor compdb
           -path build/compile_commands.json
-          -extractor $KYTHE/extractors/cxx_extractor
+          -extractor $KYTHE/extractors/cxx_extractor ||
+          ls $KYTHE_OUTPUT_DIRECTORY/*.kzip
       - name: Merge index
         run: >
-          $KYTHE/tools/kzip merge --output llvm.kzip $KYTHE_OUTPUT_DIRECTORY/*.zip
+          $KYTHE/tools/kzip merge --output llvm.kzip $KYTHE_OUTPUT_DIRECTORY/*.kzip
       - name: Create release
         uses: actions/create-release@v1
         id: create_release
