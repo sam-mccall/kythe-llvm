@@ -64,7 +64,6 @@ jobs:
           ninja -C build -t targets rule CUSTOM_COMMAND |
           grep -E "\.(cpp|h|inc)\$" | grep -E -v "tests?/" |
           xargs ninja -C build
-        if: ${{ false }}
       - name: Run kythe indexer
         run: >
           $KYTHE/tools/runextractor compdb
