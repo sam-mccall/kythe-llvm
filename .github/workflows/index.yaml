@@ -11,7 +11,7 @@ on:
   repository_dispatch: { types: index }
 jobs:
   index:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Pick last successful commit
         id: pick
